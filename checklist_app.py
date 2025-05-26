@@ -174,14 +174,13 @@ def show_checklist_execution():
                     }
                     st.success("Projeto criado com sucesso!")
                     st.session_state.criar_projeto = False
-                    st.write("Checklist salvo com sucesso:", checklist_data)
-            st.rerun()
+                    st.rerun()
                 else:
                     st.error("Preencha todos os campos")
     
     # Etapa 2: Equipamento (só se projeto existir)
-    if projeto_numero and projeto_numero in st.session_state.projetos:
-        st.subheader("2. Informações do Equipamento")
+                    if projeto_numero and projeto_numero in st.session_state.projetos:
+                        st.subheader("2. Informações do Equipamento")
         
         col1, col2 = st.columns(2)
         
@@ -278,10 +277,15 @@ def execute_checklist(projeto_numero, tag_equipamento, familia):
             # Salvar respostas no session state
             checklist_data["respostas"] = respostas_temp
             checklist_data["planos_acao"] = planos_temp
-            
+
             # Finalizar checklist
             finalize_checklist(projeto_numero, tag_equipamento, familia, checklist_data)
             st.session_state[f"checklist_finalizado_{chave_equipamento}"] = True
+
+            # Debug: mostrar dados salvos
+            st.write("Checklist salvo com sucesso:", checklist_data)
+
+            # Recarregar para mostrar o resumo
             st.rerun()
 
 def finalize_checklist(projeto_numero, tag_equipamento, familia, checklist_data):
