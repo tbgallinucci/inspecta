@@ -136,6 +136,11 @@ def show_home():
 def show_checklist_execution():
     st.header("📋 Executar Checklist")
     
+    # Verificar se deve mostrar resumo de checklist finalizado
+    if 'checklist_finalizado_mostrar' in st.session_state:
+        show_checklist_summary_page()
+        return
+    
     # Etapa 1: Projeto
     st.subheader("1. Informações do Projeto")
     
@@ -179,8 +184,8 @@ def show_checklist_execution():
                     st.error("Preencha todos os campos")
     
     # Etapa 2: Equipamento (só se projeto existir)
-                    if projeto_numero and projeto_numero in st.session_state.projetos:
-                        st.subheader("2. Informações do Equipamento")
+    if projeto_numero and projeto_numero in st.session_state.projetos:
+        st.subheader("2. Informações do Equipamento")
         
         col1, col2 = st.columns(2)
         
@@ -217,12 +222,7 @@ def execute_checklist(projeto_numero, tag_equipamento, familia):
     template = TEMPLATES_CHECKLIST[familia]
     chave_equipamento = f"{projeto_numero}_{tag_equipamento}"
     
-    # Verificar se checklist já foi finalizado
-    if f"checklist_finalizado_{chave_equipamento}" in st.session_state:
-        show_checklist_summary(projeto_numero, tag_equipamento, familia)
-        return
-    
-    # Inicializar dados do checklist
+    # Inicializar dados do checklist se não existir
     if f"checklist_{chave_equipamento}" not in st.session_state:
         st.session_state[f"checklist_{chave_equipamento}"] = {
             "respostas": {},
@@ -244,9 +244,12 @@ def execute_checklist(projeto_numero, tag_equipamento, familia):
             col1, col2 = st.columns([3, 1])
             
             with col1:
+                # Manter resposta anterior se existir
+                resposta_anterior = checklist_data["respostas"].get(i, "Conforme")
                 resposta = st.radio(
                     f"Resposta {i+1}",
                     ["Conforme", "Não Conforme"],
+                    index=0 if resposta_anterior == "Conforme" else 1,
                     key=f"resposta_{i}_{chave_equipamento}",
                     horizontal=True
                 )
@@ -259,12 +262,14 @@ def execute_checklist(projeto_numero, tag_equipamento, familia):
                     key=f"foto_{i}_{chave_equipamento}"
                 )
                 if foto:
-                    checklist_data["fotos"][i] = foto.getvalue()
+                    checklist_data["fotos"][i] = foto
             
             # Plano de ação para não conformidades
             if resposta == "Não Conforme":
+                plano_anterior = checklist_data["planos_acao"].get(i, "")
                 plano_acao = st.text_area(
                     f"Plano de Ação para item {i+1}",
+                    value=plano_anterior,
                     key=f"plano_{i}_{chave_equipamento}",
                     placeholder="Descreva as ações necessárias para corrigir a não conformidade..."
                 )
@@ -275,17 +280,20 @@ def execute_checklist(projeto_numero, tag_equipamento, familia):
         # Finalizar checklist
         if st.form_submit_button("✅ Finalizar Checklist"):
             # Salvar respostas no session state
-            checklist_data["respostas"] = respostas_temp
-            checklist_data["planos_acao"] = planos_temp
-
+            checklist_data["respostas"] = respostas_temp.copy()
+            checklist_data["planos_acao"] = planos_temp.copy()
+            
             # Finalizar checklist
-            finalize_checklist(projeto_numero, tag_equipamento, familia, checklist_data)
-            st.session_state[f"checklist_finalizado_{chave_equipamento}"] = True
-
-            # Debug: mostrar dados salvos
-            st.write("Checklist salvo com sucesso:", checklist_data)
-
-            # Recarregar para mostrar o resumo
+            checklist_id = finalize_checklist(projeto_numero, tag_equipamento, familia, checklist_data)
+            
+            # Configurar para mostrar resumo
+            st.session_state.checklist_finalizado_mostrar = {
+                "projeto_numero": projeto_numero,
+                "tag_equipamento": tag_equipamento,
+                "familia": familia,
+                "checklist_id": checklist_id
+            }
+            
             st.rerun()
 
 def finalize_checklist(projeto_numero, tag_equipamento, familia, checklist_data):
@@ -295,7 +303,7 @@ def finalize_checklist(projeto_numero, tag_equipamento, familia, checklist_data)
     total_items = len(TEMPLATES_CHECKLIST[familia]["items"])
     conformes = sum(1 for resp in checklist_data["respostas"].values() if resp == "Conforme")
     nao_conformes = total_items - conformes
-    percentual_conformidade = (conformes / total_items) * 100
+    percentual_conformidade = (conformes / total_items) * 100 if total_items > 0 else 0
     
     # Salvar equipamento
     st.session_state.equipamentos[chave_equipamento] = {
@@ -320,66 +328,108 @@ def finalize_checklist(projeto_numero, tag_equipamento, familia, checklist_data)
         "conformes": conformes,
         "nao_conformes": nao_conformes,
         "percentual_conformidade": percentual_conformidade,
-        "respostas": checklist_data["respostas"],
-        "planos_acao": checklist_data["planos_acao"],
-        "fotos": checklist_data["fotos"]
+        "respostas": checklist_data["respostas"].copy(),
+        "planos_acao": checklist_data["planos_acao"].copy(),
+        "fotos": checklist_data["fotos"].copy()
     }
     
-    # Salvar dados para exibição do resumo
-    st.session_state[f"resumo_{chave_equipamento}"] = {
-        "total_items": total_items,
-        "conformes": conformes,
-        "nao_conformes": nao_conformes,
-        "percentual_conformidade": percentual_conformidade,
-        "checklist_id": checklist_id
-    }
+    return checklist_id
 
-def show_checklist_summary(projeto_numero, tag_equipamento, familia):
-    chave_equipamento = f"{projeto_numero}_{tag_equipamento}"
-    resumo = st.session_state.get(f"resumo_{chave_equipamento}")
+def show_checklist_summary_page():
+    """Página dedicada para mostrar o resumo do checklist finalizado"""
+    resumo_data = st.session_state.checklist_finalizado_mostrar
+    projeto_numero = resumo_data["projeto_numero"]
+    tag_equipamento = resumo_data["tag_equipamento"]
+    familia = resumo_data["familia"]
+    checklist_id = resumo_data["checklist_id"]
     
-    if not resumo:
-        st.error("Erro: Dados do resumo não encontrados")
-        return
+    # Buscar dados do checklist finalizado
+    checklist = st.session_state.checklists[checklist_id]
     
-    st.success("✅ Checklist finalizado com sucesso!")
+    st.header("✅ Checklist Finalizado com Sucesso!")
+    
+    # Informações básicas
+    col1, col2 = st.columns(2)
+    with col1:
+        st.write(f"**Projeto:** {projeto_numero}")
+        st.write(f"**TAG:** {tag_equipamento}")
+    with col2:
+        st.write(f"**Família:** {familia} - {FAMILIAS[familia]}")
+        st.write(f"**Data:** {checklist['data_execucao'].strftime('%d/%m/%Y %H:%M')}")
     
     # Mostrar resumo
     st.subheader("📊 Resumo do Checklist")
     col1, col2, col3 = st.columns(3)
     
     with col1:
-        st.metric("Total de Itens", resumo["total_items"])
+        st.metric("Total de Itens", checklist["total_items"])
     with col2:
-        st.metric("Conformes", resumo["conformes"])
+        st.metric("Conformes", checklist["conformes"])
     with col3:
-        st.metric("Não Conformes", resumo["nao_conformes"])
+        st.metric("Não Conformes", checklist["nao_conformes"])
     
-    st.metric("Percentual de Conformidade", f"{resumo['percentual_conformidade']:.1f}%")
+    st.metric("Percentual de Conformidade", f"{checklist['percentual_conformidade']:.1f}%")
     
-    if resumo["nao_conformes"] > 0:
-        st.warning(f"⚠️ {resumo['nao_conformes']} não conformidade(s) identificada(s)")
+    if checklist["nao_conformes"] > 0:
+        st.warning(f"⚠️ {checklist['nao_conformes']} não conformidade(s) identificada(s)")
+        
+        # Mostrar não conformidades
+        st.subheader("🔧 Não Conformidades e Planos de Ação")
+        template = TEMPLATES_CHECKLIST[familia]
+        
+        for i, resposta in checklist["respostas"].items():
+            if resposta == "Não Conforme":
+                item_texto = template["items"][i]
+                st.error(f"**Item {i+1}:** {item_texto}")
+                
+                plano = checklist["planos_acao"].get(i, "")
+                if plano:
+                    st.write(f"**Plano de Ação:** {plano}")
+                else:
+                    st.write("**Plano de Ação:** Não especificado")
+                st.divider()
     
     # Botões de ação
+    st.subheader("Próximas Ações")
     col1, col2, col3 = st.columns(3)
     
     with col1:
-        if st.button("📊 Ver Relatório Completo"):
-            st.session_state.ir_para_relatorio = resumo["checklist_id"]
-            st.rerun()
+        if st.button("📊 Ver Relatório Completo", use_container_width=True):
+            st.session_state.ir_para_relatorio = checklist_id
+            del st.session_state.checklist_finalizado_mostrar
+            # Limpar dados temporários do checklist
+            limpar_dados_temporarios_checklist(projeto_numero, tag_equipamento)
     
     with col2:
-        if st.button("🔄 Novo Checklist"):
-            # Limpar dados temporários
-            keys_to_remove = [k for k in st.session_state.keys() if chave_equipamento in k]
-            for key in keys_to_remove:
-                del st.session_state[key]
-            st.rerun()
+        if st.button("🔄 Novo Checklist", use_container_width=True):
+            del st.session_state.checklist_finalizado_mostrar
+            # Limpar dados temporários do checklist
+            limpar_dados_temporarios_checklist(projeto_numero, tag_equipamento)
     
     with col3:
-        if st.button("🏠 Voltar ao Início"):
-            # st.session_state.clear()  # Desativado para evitar perda de dados durante depuração
-            st.rerun()
+        if st.button("🏠 Voltar ao Início", use_container_width=True):
+            del st.session_state.checklist_finalizado_mostrar
+            # Limpar dados temporários do checklist
+            limpar_dados_temporarios_checklist(projeto_numero, tag_equipamento)
+
+def limpar_dados_temporarios_checklist(projeto_numero, tag_equipamento):
+    """Limpa apenas os dados temporários do checklist, mantendo os dados persistidos"""
+    chave_equipamento = f"{projeto_numero}_{tag_equipamento}"
+    
+    # Lista de chaves temporárias para remover
+    keys_to_remove = []
+    for key in st.session_state.keys():
+        if f"checklist_{chave_equipamento}" in key:
+            keys_to_remove.append(key)
+        elif f"resumo_{chave_equipamento}" in key:
+            keys_to_remove.append(key)
+        elif f"checklist_finalizado_{chave_equipamento}" in key:
+            keys_to_remove.append(key)
+    
+    # Remover as chaves temporárias
+    for key in keys_to_remove:
+        if key in st.session_state:
+            del st.session_state[key]
 
 def show_records():
     st.header("📊 Consultar Registros")
@@ -518,7 +568,7 @@ def generate_report(checklist_id):
     
     # Planos de ação consolidados
     if checklist["nao_conformes"] > 0:
-        st.subheader("🔧 Planos de Ação")
+        st.subheader("🔧 Planos de Ação Consolidados")
         for i, plano in checklist["planos_acao"].items():
             if plano:
                 st.write(f"**Item {i+1}:** {plano}")
