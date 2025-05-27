@@ -15,7 +15,6 @@ if 'current_equipment_tag' not in st.session_state:
 if 'current_package' not in st.session_state:
     st.session_state.current_package = None
 
-
 # Inicializa o banco de dados
 database.create_tables()
 
@@ -58,10 +57,10 @@ def generate_pdf_report(checklist_data):
     projeto_numero = checklist_data[0]['numero_projeto']
     projeto_nome = checklist_data[0]['nome_projeto']
     equipamento_tag = checklist_data[0]['equipamento_tag']
-    data_criacao = checklist_data[0]['data_criacao']
+    # data_criacao = checklist_data[0]['data_criacao'] # KeyError occurred here
 
     pdf.chapter_title("Informações do Projeto e Equipamento:")
-    pdf.chapter_body(f"Número do Projeto: {projeto_numero}\nNome do Projeto: {projeto_nome}\nTAG do Equipamento: {equipamento_tag}\nData do Checklist: {data_criacao}")
+    pdf.chapter_body(f"Número do Projeto: {projeto_numero}\nNome do Projeto: {projeto_nome}\nTAG do Equipamento: {equipamento_tag}") # Removed data_criacao for now
     pdf.ln(5)
 
     pdf.chapter_title("Itens do Checklist:")
@@ -138,12 +137,6 @@ elif menu_selection == "Criar Checklist":
             equipamento_existente = database.get_equipamento_por_tag_projeto(projeto_selecionado.id, tag_equipamento)
             if equipamento_existente:
                 st.warning(f"O TAG '{tag_equipamento}' já existe para este projeto. Não é possível iniciar um novo checklist para este TAG.")
-                # Opcional: Permitir continuar se o checklist não foi rodado
-                # if not database.get_checklist_completo(equipamento_existente.id):
-                #     st.info("No entanto, nenhum checklist foi iniciado para este equipamento. Você pode continuar.")
-                #     if st.button("Continuar Checklist Existente"):
-                #         # Lógica para carregar checklist existente
-                #         pass
             else:
                 if st.button("Iniciar Checklist"):
                     # Cria o equipamento e o checklist
@@ -155,7 +148,8 @@ elif menu_selection == "Criar Checklist":
                         st.session_state.current_package = selected_package
                         st.session_state.checklist_started = True
                         st.success(f"Checklist iniciado para o TAG: {tag_equipamento} ({selected_package})")
-                        st.write(st.session_state)
+                        # REMOVE ESTA LINHA: st.experimental_rerun() #
+                            # Reinicia para mostrar a seção do checklist
                     else:
                         st.error("Erro ao criar equipamento. Verifique se o TAG já existe para este projeto.")
 
@@ -167,8 +161,8 @@ elif menu_selection == "Criar Checklist":
 
         st.write("Responda 'S' (Conforme), 'NA' (Não Aplicável) ou 'N' (Não Conforme).")
 
-        # Usar um formulário para submeter todas as respostas de uma vez
         with st.form("checklist_form"):
+            all_responses = {}
             for i, pergunta in enumerate(checklist_template):
                 st.subheader(f"Item {i+1}: {pergunta}")
                 col1, col2 = st.columns([1, 3])
@@ -178,90 +172,49 @@ elif menu_selection == "Criar Checklist":
                         ('S', 'NA', 'N'),
                         key=f"resposta_{i}"
                     )
+                    all_responses[pergunta] = resposta
                 with col2:
                     foto = st.file_uploader(
                         "Anexar Foto (Opcional):",
                         type=["png", "jpg", "jpeg"],
                         key=f"foto_{i}"
                     )
+                    if foto:
+                        st.session_state[f'foto_{pergunta}'] = foto.name
+                    else:
+                        st.session_state.pop(f'foto_{pergunta}', None)
+
                 if resposta == 'N':
                     plano_acao = st.text_area(
                         "Plano de Ação para Não Conformidade:",
                         key=f"plano_acao_{i}"
                     )
-                    st.session_state[f'plano_acao_required_{i}'] = True
+                    st.session_state[f'plano_acao_{pergunta}'] = plano_acao
                 else:
-                    st.session_state[f'plano_acao_required_{i}'] = False
-
-                st.session_state[f'pergunta_{i}'] = pergunta
-                st.session_state[f'resposta_temp_{i}'] = resposta
-                st.session_state[f'foto_temp_{i}'] = foto.name if foto else None # Apenas o nome do arquivo
+                    st.session_state.pop(f'plano_acao_{pergunta}', None)
 
             submitted = st.form_submit_button("Finalizar Checklist")
 
             if submitted:
                 all_items_saved = True
-                for i, pergunta in enumerate(checklist_template):
-                    resposta = st.session_state[f'resposta_temp_{i}']
-                    foto_name = st.session_state[f'foto_temp_{i}']
-                    plano_acao_required = st.session_state[f'plano_acao_required_{i}']
-                    plano_acao = st.session_state.get(f'plano_acao_{i}', '')
-
-                    # Salva o item do checklist
-                    database.adicionar_item_checklist(
-                        st.session_state.current_checklist_id,
-                        pergunta
-                    )
-                    # Recupera o ID do item recém-adicionado para atualizar
-                    # Isso é um pouco complicado com SQLite e Streamlit sem um ORM.
-                    # Uma abordagem mais robusta seria adicionar o item com a resposta já,
-                    # ou ter uma função que retorna o ID do último item inserido para o checklist
-                    # Por simplicidade, vamos assumir que a ordem de inserção é a mesma da iteração.
-                    # Em um sistema real, você buscaria o item pelo checklist_id e pergunta.
-                    # Para este exemplo, vamos simplificar:
-                    # A função adicionar_item_checklist não retorna o ID, então vamos ter que buscar.
-                    # Para fins de demonstração, vamos simular a atualização.
-                    # Em um ambiente real, você faria um INSERT com todos os dados de uma vez
-                    # ou uma busca mais precisa para o item_id.
-
-                    # Para o propósito desta demonstração, vamos simular a atualização
-                    # ao invés de buscar o item_id recém-criado, que seria mais complexo
-                    # sem um ORM ou um retorno direto da função de inserção.
-                    # A melhor abordagem seria modificar `adicionar_item_checklist`
-                    # para retornar o `cursor.lastrowid` e então usar esse ID para o plano de ação.
-                    # Por enquanto, vamos usar uma simulação:
-                    # Supondo que o item_id é o último adicionado.
-                    # Isso é um ponto fraco que precisaria ser melhorado em produção.
-
-                    # Para fins de demonstração, vamos buscar o último item adicionado para este checklist
-                    # (isso não é ideal para concorrência, mas funciona para um app simples)
-                    conn = database.sqlite3.connect(database.DATABASE_NAME)
-                    cursor = conn.cursor()
-                    cursor.execute("SELECT id FROM itens_checklist WHERE checklist_id=? AND pergunta=? ORDER BY id DESC LIMIT 1",
-                                   (st.session_state.current_checklist_id, pergunta))
-                    item_id_for_update = cursor.fetchone()[0]
-                    conn.close()
-
-                    database.atualizar_item_checklist(
-                        item_id_for_update,
-                        resposta,
-                        foto_name
-                    )
-
-                    if resposta == 'N' and plano_acao_required and plano_acao:
-                        database.criar_plano_acao(item_id_for_update, plano_acao)
-                    elif resposta == 'N' and plano_acao_required and not plano_acao:
+                checklist_id = st.session_state.current_checklist_id
+                for pergunta, resposta in all_responses.items():
+                    foto_path = st.session_state.get(f'foto_{pergunta}')
+                    plano = st.session_state.get(f'plano_acao_{pergunta}')
+                    item_id = database.adicionar_item_checklist(checklist_id, pergunta, resposta, foto_path)
+                    if resposta == 'N' and plano:
+                        database.criar_plano_acao(item_id, plano)
+                    elif resposta == 'N' and not plano:
                         st.error(f"O item '{pergunta}' foi marcado como 'Não Conforme', mas o plano de ação está vazio.")
                         all_items_saved = False
-                        break # Para o loop se um plano de ação obrigatório estiver faltando
+                        break
 
                 if all_items_saved:
                     st.success("Checklist finalizado e salvo com sucesso!")
-                    # Limpa o estado da sessão para um novo checklist
-                    #del st.session_state.checklist_started
-                    #del st.session_state.current_checklist_id
-                    #del st.session_state.current_equipment_tag
-                    #del st.session_state.current_package
+                    del st.session_state.current_checklist_id
+                    del st.session_state.current_equipment_tag
+                    del st.session_state.current_package
+                    del st.session_state.checklist_started
                     st.experimental_rerun() # Reinicia para limpar o formulário
                 else:
                     st.warning("Por favor, preencha todos os planos de ação para itens 'Não Conforme'.")
