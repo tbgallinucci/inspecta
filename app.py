@@ -156,7 +156,6 @@ elif menu_selection == "Criar Checklist":
                         st.session_state.checklist_started = True
                         st.success(f"Checklist iniciado para o TAG: {tag_equipamento} ({selected_package})")
                         st.write(st.session_state)
-                        st.experimental_rerun() # Reinicia para mostrar a seção do checklist
                     else:
                         st.error("Erro ao criar equipamento. Verifique se o TAG já existe para este projeto.")
 
