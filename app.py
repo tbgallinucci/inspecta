@@ -258,10 +258,10 @@ elif menu_selection == "Criar Checklist":
                 if all_items_saved:
                     st.success("Checklist finalizado e salvo com sucesso!")
                     # Limpa o estado da sessão para um novo checklist
-                    del st.session_state.checklist_started
-                    del st.session_state.current_checklist_id
-                    del st.session_state.current_equipment_tag
-                    del st.session_state.current_package
+                    #del st.session_state.checklist_started
+                    #del st.session_state.current_checklist_id
+                    #del st.session_state.current_equipment_tag
+                    #del st.session_state.current_package
                     st.experimental_rerun() # Reinicia para limpar o formulário
                 else:
                     st.warning("Por favor, preencha todos os planos de ação para itens 'Não Conforme'.")
