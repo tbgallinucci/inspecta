@@ -6,6 +6,15 @@ import pandas as pd
 from datetime import datetime
 from fpdf import FPDF # Para geração de PDF
 
+if 'checklist_started' not in st.session_state:
+    st.session_state.checklist_started = False
+if 'current_checklist_id' not in st.session_state:
+    st.session_state.current_checklist_id = None
+if 'current_equipment_tag' not in st.session_state:
+    st.session_state.current_equipment_tag = None
+if 'current_package' not in st.session_state:
+    st.session_state.current_package = None
+
 # Inicializa o banco de dados
 database.create_tables()
 
