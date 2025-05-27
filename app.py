@@ -163,7 +163,7 @@ elif menu_selection == "Criar Checklist":
         st.write("--- Estado da Sessão ao Exibir Checklist ---")
         st.write(st.session_state)
         st.header(f"Realizar Checklist para {st.session_state.current_equipment_tag} ({st.session_state.current_package})")
-        checklist_template = utils.get_checklist_template(st.session_state.current_package))
+        checklist_template = utils.get_checklist_template(st.session_state.current_package)
 
         st.write("Responda 'S' (Conforme), 'NA' (Não Aplicável) ou 'N' (Não Conforme).")
 
