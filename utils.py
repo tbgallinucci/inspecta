@@ -532,4 +532,6 @@ def get_checklist_template(package):
             "Sem danos visíveis?",
         ]
     }
+    if not package:
+        return templates
     return templates.get(package, {"Default": ["Condição geral do equipamento?", "Identificação (TAG) visível?"]})
