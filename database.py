@@ -144,7 +144,6 @@ def get_checklist_completo(checklist_id):
             e.tag AS equipamento_tag,
             p.numero_projeto,
             p.nome_projeto,
-            c.data_criacao AS data_criacao, -- Adicionada a coluna data_criacao
             ic.id AS item_id,
             ic.pergunta,
             ic.resposta,
