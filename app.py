@@ -161,6 +161,7 @@ elif menu_selection == "Criar Checklist":
                         st.error("Erro ao criar equipamento. Verifique se o TAG já existe para este projeto.")
 
     if st.session_state.get('checklist_started', False) and st.session_state.get('current_checklist_id'):
+        st.write(st.session_state)
         st.header(f"Realizar Checklist para {st.session_state.current_equipment_tag} ({st.session_state.current_package})")
         checklist_template = utils.get_checklist_template(st.session_state.current_package)
 
